@@ -1,8 +1,5 @@
 
 import streamlit as st
-import requests
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 st.set_page_config(
     page_title="딩동! 직원 호출",
@@ -10,14 +7,6 @@ st.set_page_config(
     layout="centered",
 )
 
-REQUESTS = [
-    ("🙋 직원 호출", "직원 호출"),
-    ("🖥️ 키오스크 사용 도움", "키오스크 사용 도움"),
-    ("💳 결제 도움", "결제 도움"),
-    ("🍽️ 주문 관련 문의", "주문 관련 문의"),
-]
-
-# 화면 디자인
 st.markdown("""
 <style>
 .main .block-container {
@@ -59,18 +48,22 @@ st.markdown("""
 
 st.subheader("필요한 도움을 선택해 주세요")
 
+requests_list = [
+    ("🙋 직원 호출", "직원 호출"),
+    ("🖥️ 키오스크 사용 도움", "키오스크 사용 도움"),
+    ("💳 결제 도움", "결제 도움"),
+    ("🍽️ 주문 관련 문의", "주문 관련 문의"),
+]
+
 if "selected_request" not in st.session_state:
     st.session_state.selected_request = "직원 호출"
 
-# 도움 항목을 두 칸씩 표시
-for start in range(0, len(REQUESTS), 2):
+for start in range(0, len(requests_list), 2):
     cols = st.columns(2)
 
     for offset, (label, value) in enumerate(
-        REQUESTS[start:start + 2]
+        requests_list[start:start + 2]
     ):
-        index = start + offset
-
         with cols[offset]:
             selected = (
                 st.session_state.selected_request == value
@@ -78,7 +71,7 @@ for start in range(0, len(REQUESTS), 2):
 
             if st.button(
                 ("✅ " if selected else "") + label,
-                key=f"request_{index}",
+                key=f"request_{start + offset}",
                 type="primary" if selected else "secondary",
                 use_container_width=True,
             ):
@@ -88,74 +81,21 @@ for start in range(0, len(REQUESTS), 2):
 st.write("")
 
 st.caption(
-    f"선택한 요청: **{st.session_state.selected_request}**"
+    f"선택한 요청: {st.session_state.selected_request}"
 )
 
-# 직원에게 텔레그램 알림 전송
-def notify_staff(message):
-    try:
-        token = st.secrets["TELEGRAM_BOT_TOKEN"]
-        chat_id = st.secrets["TELEGRAM_CHAT_ID"]
-    except Exception:
-        return False, (
-            "직원 알림 설정이 필요해요. "
-            "관리자가 텔레그램 정보를 등록해야 합니다."
-        )
-
-    if not token or not chat_id:
-        return False, "직원 알림 설정을 확인해 주세요."
-
-    try:
-        response = requests.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={
-                "chat_id": chat_id,
-                "text": message,
-            },
-            timeout=10,
-        )
-        response.raise_for_status()
-
-        result = response.json()
-        if not result.get("ok"):
-            return False, "직원 알림 전송에 실패했어요."
-
-        return True, "직원에게 호출을 전달했어요!"
-
-    except (requests.RequestException, ValueError):
-        return False, (
-            "알림 전송에 실패했어요. "
-            "인터넷 연결이나 알림 설정을 확인해 주세요."
-        )
-
-
-# 큰 직원 호출 버튼
 if st.button(
     "🔔 직원 호출하기",
     type="primary",
     use_container_width=True,
 ):
-    request_type = st.session_state.selected_request
+    st.session_state.call_completed = True
 
-    now = datetime.now(
-        ZoneInfo("Asia/Seoul")
-    ).strftime("%Y-%m-%d %H:%M:%S")
-
-    message = (
-        "🔔 키오스크 직원 호출\n"
-        f"요청 내용: {request_type}\n"
-        f"호출 시간: {now}\n"
-        "직원의 확인이 필요합니다."
+if st.session_state.get("call_completed", False):
+    st.success("✅ 직원이 호출되었습니다!")
+    st.info(
+        f"요청 내용: {st.session_state.selected_request}"
     )
-
-    with st.spinner("직원에게 호출을 전달하고 있어요..."):
-        success, result_message = notify_staff(message)
-
-    if success:
-        st.success("✅ " + result_message)
-        st.info("직원이 확인할 때까지 잠시 기다려 주세요.")
-    else:
-        st.error("⚠️ " + result_message)
 
 st.divider()
 st.caption("편안한 식사를 위해 언제든 도움을 요청해 주세요 😊")
